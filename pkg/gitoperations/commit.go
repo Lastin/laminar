@@ -2,6 +2,7 @@ package gitoperations
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/labstack/gommon/log"
 	"os"
 	"os/exec"
@@ -55,7 +56,7 @@ func (c *Client) executeCmd(command string, path string) {
 }
 
 func (c *Client) CommitAndPush(registry cfg.GitRepo, message string) {
-	path := GetRepoPath(registry)
+	path := registry.GetRealPath()
 	r, err := git.PlainOpen(path)
 	if err != nil {
 		c.logger.Errorw("error opening repo",
@@ -66,7 +67,7 @@ func (c *Client) CommitAndPush(registry cfg.GitRepo, message string) {
 
 	w, err := r.Worktree()
 	if err != nil {
-		log.Fatal("Couldn't open git in %v [%v]", path, err)
+		log.Fatal(fmt.Sprintf("Couldn't open git in %v [%v]", path, err))
 	}
 
 	if len(registry.PreCommitCommands) > 0 {

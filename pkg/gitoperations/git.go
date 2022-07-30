@@ -2,20 +2,17 @@ package gitoperations
 
 import (
 	"fmt"
-	"os"
-	"strings"
-
-	"github.com/go-git/go-git/v5/plumbing"
-
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"os"
 
 	"github.com/digtux/laminar/pkg/cfg"
-	"github.com/digtux/laminar/pkg/common"
+	"github.com/digtux/laminar/pkg/shared"
 )
 
 func (c *Client) Pull(registry cfg.GitRepo) {
-	path := GetRepoPath(registry)
+	path := registry.GetRealPath()
 	r, err := git.PlainOpen(path)
 	if err != nil {
 		c.logger.Errorw("error opening repo",
@@ -51,15 +48,9 @@ func (c *Client) Pull(registry cfg.GitRepo) {
 	c.logger.Debugf(c.GetCommitId(path))
 }
 
-func GetRepoPath(registry cfg.GitRepo) string {
-	replacedSlash := strings.Replace(registry.Branch, "/", "-", -1)
-	replacedColon := strings.Replace(replacedSlash, ":", "-", -1)
-	return "/tmp/" + registry.URL + "-" + replacedColon
-}
-
-// All-In-One method that will do a clone and checkout
+// InitialGitCloneAndCheckout All-In-One method that will do a clone and checkout
 func (c *Client) InitialGitCloneAndCheckout(registry cfg.GitRepo) *git.Repository {
-	diskPath := GetRepoPath(registry)
+	diskPath := registry.GetRealPath()
 	c.logger.Debugw("Doing initialGitClone",
 		"url", registry.URL,
 		"branch", registry.Branch,
@@ -68,7 +59,7 @@ func (c *Client) InitialGitCloneAndCheckout(registry cfg.GitRepo) *git.Repositor
 
 	auth := c.getAuth(registry.Key)
 
-	if common.IsDir(diskPath, c.logger) {
+	if shared.IsDir(diskPath, c.logger) {
 		c.logger.Debugw("previous checkout detected.. purging it",
 			"path", diskPath,
 		)

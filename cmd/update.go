@@ -32,12 +32,12 @@ package cmd
 //	// get ready to add the discovered files to the slice
 //	for _, p := range thisReposPaths{
 //		// get the path of where the git repo is checked out
-//		relativeGitPath := git.GetRepoPath(gitRepo)
+//		relativeGitPath := git.GetRealPath(gitRepo)
 //		// combine these
 //		realPath := fmt.Sprintf("%s/%s", relativeGitPath, p)
 //
 //		// finally this will return all files found
-//		for _, x := range operations.FindFiles(realPath) {
+//		for _, x := range operations.findFiles(realPath) {
 //			fileList = append(fileList, x)
 //		}
 //

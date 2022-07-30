@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/digtux/laminar/pkg/common"
+	"github.com/digtux/laminar/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -32,15 +32,15 @@ func (c *Client) FindFiles(searchPath string) []string {
 
 		// check for errors
 		if errX != nil {
-			//log.Warnw("FindFiles error",
+			//log.Warnw("findFiles error",
 			//	"path", pathX,
 			//	"err", errX,
 			//)
 			return errX
 		}
 
-		if common.IsFile(pathX, c.logger) {
-			c.logger.Debugw("FindFiles found file",
+		if isFile, _ := isFile(pathX); isFile {
+			c.logger.Debugw("findFiles found file",
 				"fileName", infoX.Name(),
 			)
 
@@ -60,7 +60,7 @@ func (c *Client) FindFiles(searchPath string) []string {
 		return nil
 	}
 
-	realPath := common.GetFileAbsPath(searchPath, c.logger)
+	realPath := shared.GetFileAbsPath(searchPath, c.logger)
 	err := filepath.Walk(realPath, searchFunc)
 
 	if err != nil {
@@ -78,7 +78,7 @@ func (c *Client) FindFiles(searchPath string) []string {
 // it should work on other types but YMMV
 func (c *Client) Search(file string, searchString string) (matches []string) {
 	pat := []byte(searchString)
-	fp := common.GetFileAbsPath(file, c.logger)
+	fp := shared.GetFileAbsPath(file, c.logger)
 	f, err := os.Open(fp)
 	if err != nil {
 		log.Fatal(err)
@@ -96,9 +96,7 @@ func (c *Client) Search(file string, searchString string) (matches []string) {
 			// but it would be madness for a json operations for example..
 			for _, field := range strings.Fields(scanner.Text()) {
 				if bytes.Contains([]byte(field), pat) {
-					// val := strings.Fields(scanner.Text())[1]
 					matches = append(matches, field)
-					//log.Debug(scanner.Text())
 				}
 			}
 		}
@@ -106,18 +104,14 @@ func (c *Client) Search(file string, searchString string) (matches []string) {
 	if err := scanner.Err(); err != nil {
 		log.Error(err)
 	}
-	//if len(matches) > 0 {
-	//	log.Debugw("Search found some matches",
-	//		"searchString", searchString,
-	//		"operations", file,
-	//		"matches", matches,
-	//	)
-	//} else {
-	//	log.Debugw("Search found no matches",
-	//		"searchString", searchString,
-	//		"operations", file,
-	//		"matches", matches,
-	//	)
-	//}
 	return matches
+}
+
+// isFile will return true if the path is a normal file (not directory or link)
+func isFile(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	return fileInfo.Mode().IsRegular(), nil
 }

@@ -3,14 +3,14 @@ package gitoperations
 import (
 	"io/ioutil"
 
-	"github.com/digtux/laminar/pkg/common"
+	"github.com/digtux/laminar/pkg/shared"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	crypto_ssh "golang.org/x/crypto/ssh"
 )
 
 func (c *Client) getSshKeySigner(fileName string) crypto_ssh.Signer {
 
-	fullPath := common.GetFileAbsPath(fileName, c.logger)
+	fullPath := shared.GetFileAbsPath(fileName, c.logger)
 	sshKey, err := ioutil.ReadFile(fullPath)
 	if err != nil {
 		c.logger.Fatalw("unable to read private ssh key",

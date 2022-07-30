@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/digtux/laminar/pkg/common"
+	"github.com/digtux/laminar/pkg/shared"
 	"github.com/digtux/laminar/pkg/web"
 	"github.com/pkg/errors"
 	"github.com/tidwall/buntdb"
@@ -55,7 +55,7 @@ type Daemon struct {
 }
 
 func New() (d *Daemon, err error) {
-	logger := common.GetLogger(debug)
+	logger := shared.GetLogger(debug)
 	appConfig, err := loadConfig(logger)
 	if err != nil {
 		return nil, err
@@ -148,13 +148,13 @@ func (d *Daemon) masterTask() {
 
 	// TODO: docker reg Timeout?
 	// lets gather a full list of docker images we can find matching the configured registries
-	d.scanDockerRegistries()
+	//d.scanDockerRegistries()
 
 	// now that we can assume we have some tags in cache, we run a
 	// loop over GitRepos
-	for _, state := range d.gitState {
-		d.updateFiles(*state.repoCfg)
-	}
+	//for _, state := range d.gitState {
+	//	d.updateFiles(*state.repoCfg)
+	//}
 	if oneShot {
 		d.logger.Warn("--one-shot detected.. laminar is now terminating")
 		os.Exit(0)
@@ -162,62 +162,62 @@ func (d *Daemon) masterTask() {
 }
 
 func (d *Daemon) singleRepoTask(r web.DockerBuildJSON) {
-	if reg, ok := d.dockerRegistries[r.DockerRegistryUrl]; ok {
-		for _, state := range d.gitState {
-			d.updateGitRepoState(state)
-		}
-
-		d.scanDockerRegistry(reg)
-
-		for _, state := range d.gitState {
-			d.updateFiles(*state.repoCfg)
-		}
-	}
+	//if reg, ok := d.dockerRegistries[r.DockerRegistryUrl]; ok {
+	//	for _, state := range d.gitState {
+	//		d.updateGitRepoState(state)
+	//	}
+	//
+	//	//d.scanDockerRegistry(reg)
+	//
+	//	//for _, state := range d.gitState {
+	//	//	//d.updateFiles(*state.repoCfg)
+	//	//}
+	//}
 }
 
-func (d *Daemon) updateFiles(gitRepo cfg.GitRepo) {
-	registryStrings := d.getRegistryStrings()
-	triggerCommitAndPush := false
-	var changes []ChangeRequest
-	for _, updatePolicy := range gitRepo.Updates {
-		var fileList []string
-		// assemble a list of target files for this Update
-		for _, p := range updatePolicy.Files {
-			// get the path of where the gitoperations repo is checked out
-			relativeGitPath := gitoperations.GetRepoPath(gitRepo)
-			// combine these
-			realPath := fmt.Sprintf("%s/%s", relativeGitPath, p.Path)
-
-			// finally this will return all files found
-			for _, paths := range d.opsClient.FindFiles(realPath) {
-				fileList = append(fileList, paths)
-			}
-		}
-
-		for _, filePath := range fileList {
-			d.logger.Debugw("applying update policy",
-				"laminar.file", filePath,
-				"laminar.pattern", updatePolicy.PatternString,
-				"laminar.blacklist", updatePolicy.BlackList,
-			)
-			newChanges := d.doUpdate(filePath, updatePolicy, registryStrings)
-			if len(newChanges) > 0 {
-				d.logger.Infow("updates desired",
-					"laminar.file", filePath,
-					"laminar.pattern", updatePolicy.PatternString,
-				)
-				triggerCommitAndPush = true
-				for _, stuffDone := range newChanges {
-					changes = append(changes, stuffDone)
-				}
-			}
-		}
-	}
-
-	if triggerCommitAndPush {
-		d.commitAndPush(changes, gitRepo)
-	}
-}
+//func (d *Daemon) updateFiles(gitRepo cfg.GitRepo) {
+//	registryStrings := d.getRegistryStrings()
+//	triggerCommitAndPush := false
+//	var changes []ChangeRequest
+//	for _, updatePolicy := range gitRepo.Updates {
+//		var fileList []string
+//		// assemble a list of target files for this Update
+//		for _, p := range updatePolicy.Files {
+//			// get the path of where the gitoperations repo is checked out
+//			relativeGitPath := gitoperations.GetRepoPath(gitRepo)
+//			// combine these
+//			realPath := fmt.Sprintf("%s/%s", relativeGitPath, p.Path)
+//
+//			// finally this will return all files found
+//			for _, paths := range d.opsClient.FindFiles(realPath) {
+//				fileList = append(fileList, paths)
+//			}
+//		}
+//
+//		for _, filePath := range fileList {
+//			d.logger.Debugw("applying update policy",
+//				"laminar.file", filePath,
+//				"laminar.pattern", updatePolicy.PatternString,
+//				"laminar.blacklist", updatePolicy.BlackList,
+//			)
+//			//newChanges := d.doUpdate(filePath, updatePolicy, registryStrings)
+//			if len(newChanges) > 0 {
+//				d.logger.Infow("updates desired",
+//					"laminar.file", filePath,
+//					"laminar.pattern", updatePolicy.PatternString,
+//				)
+//				triggerCommitAndPush = true
+//				for _, stuffDone := range newChanges {
+//					changes = append(changes, stuffDone)
+//				}
+//			}
+//		}
+//	}
+//
+//	if triggerCommitAndPush {
+//		//d.commitAndPush(changes, gitRepo)
+//	}
+//}
 
 func (d *Daemon) commitAndPush(changes []ChangeRequest, repo cfg.GitRepo) {
 	msg := ""
@@ -235,32 +235,32 @@ func (d *Daemon) commitAndPush(changes []ChangeRequest, repo cfg.GitRepo) {
 	d.gitOpsClient.CommitAndPush(repo, msg)
 }
 
-func (d *Daemon) scanDockerRegistries() {
-	for _, dockerReg := range d.dockerRegistries {
-		d.scanDockerRegistry(dockerReg)
-	}
-}
+//func (d *Daemon) scanDockerRegistries() {
+//	for _, dockerReg := range d.dockerRegistries {
+//		d.scanDockerRegistry(dockerReg)
+//	}
+//}
 
-func (d *Daemon) scanDockerRegistry(dockerReg cfg.DockerRegistry) {
-	d.logger.Infow("scanning docker registry", "url", dockerReg.Reg)
-	foundDockerImages := d.FindDockerImages(
-		d.fileList,
-		fmt.Sprintf(dockerReg.Reg),
-	)
-	if len(foundDockerImages) > 0 {
-		d.dockerRegistryClient.Exec(dockerReg, foundDockerImages)
-		d.logger.Infow("found images (in gitoperations) matching a configured docker registry",
-			"laminar.regName", dockerReg.Name,
-			"laminar.reg", dockerReg.Reg,
-			"laminar.imageCount", len(foundDockerImages),
-		)
-	} else {
-		d.logger.Infow("no images tags found.. ensure the full <image>:<tag> strings present",
-			"laminar.regName", dockerReg.Name,
-			"laminar.reg", dockerReg.Reg,
-		)
-	}
-}
+//func (d *Daemon) scanDockerRegistry(dockerReg cfg.DockerRegistry) {
+//	d.logger.Infow("scanning docker registry", "url", dockerReg.Reg)
+//	foundDockerImages := d.FindDockerImages(
+//		d.fileList,
+//		fmt.Sprintf(dockerReg.Reg),
+//	)
+//	if len(foundDockerImages) > 0 {
+//		d.dockerRegistryClient.Exec(dockerReg, foundDockerImages)
+//		d.logger.Infow("found images (in gitoperations) matching a configured docker registry",
+//			"laminar.regName", dockerReg.Name,
+//			"laminar.reg", dockerReg.Reg,
+//			"laminar.imageCount", len(foundDockerImages),
+//		)
+//	} else {
+//		d.logger.Infow("no images tags found.. ensure the full <image>:<tag> strings present",
+//			"laminar.regName", dockerReg.Name,
+//			"laminar.reg", dockerReg.Reg,
+//		)
+//	}
+//}
 
 func (d *Daemon) updateGitRepoState(state GitState) {
 	// Clone all repos that haven't been cloned yet
@@ -275,7 +275,7 @@ func (d *Daemon) updateGitRepoState(state GitState) {
 
 	// This sections deals with loading remote config from the gitoperations repo
 	// if RemoteConfig is set we want to attempt to read '.laminar.yaml' from the remote repo
-	repoPath := gitoperations.GetRepoPath(*state.repoCfg)
+	repoPath := state.repoCfg.GetRealPath()
 	if state.repoCfg.RemoteConfig {
 		d.logger.Debugw("'remote config' == True.. will attempt to update config dynamically",
 			"laminar.repo", state.repoCfg.Name,
@@ -305,7 +305,7 @@ func (d *Daemon) updateGitRepoState(state GitState) {
 		"laminar.gitRepo", state.repoCfg.Name,
 		"laminar.updateRules", len(state.repoCfg.Updates),
 	)
-	d.UpdateFileList(*state.repoCfg)
+	//d.UpdateFileList(*state.repoCfg)
 
 	// we are ready to dispatch this to start searching the contents of these files
 	d.logger.Debugw("matched files in gitoperations",
@@ -314,7 +314,7 @@ func (d *Daemon) updateGitRepoState(state GitState) {
 	)
 }
 
-func (d Daemon) getRegistryStrings() []string {
+func (d *Daemon) getRegistryStrings() []string {
 	// this is a slice of the registry URLs as we expect to see them inside files
 	var registryStrings []string
 	for _, reg := range d.dockerRegistries {

@@ -1,14 +1,15 @@
-package common
+package shared
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
-
-	"go.uber.org/zap"
 )
 
 // Misc helper functions
@@ -46,37 +47,16 @@ func IsDir(path string, log *zap.SugaredLogger) bool {
 	return fileInfo.IsDir()
 }
 
-// IsFile will return true if the path is a normal file (not directory or link)
-func IsFile(path string, log *zap.SugaredLogger) bool {
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		log.Warnw("found not to be a operations",
-			"larminar.path", path,
-		)
-		return false
-	}
-	return fileInfo.Mode().IsRegular()
-}
-
-// StringInSlice returns true if a string is found in a slice of strings
-func StringInSlice(slice []string, val string) bool {
-	for _, item := range slice {
-		if item == val {
-			return true
-		}
-	}
-	return false
-}
-
 // UniqueStrings takes an array of strings in, returns only the unique ones
 func UniqueStrings(input []string) []string {
-	// credit : https://kylewbanks.com/blog/creating-unique-slices-in-go
-	u := make([]string, 0, len(input))
-	m := make(map[string]bool)
-	for _, val := range input {
-		if _, ok := m[val]; !ok {
-			m[val] = true
-			u = append(u, val)
+	sort.Strings(input)
+	size := len(input)
+	u := make([]string, 0, size)
+	for i := 0; i < size; {
+		current := input[i]
+		u = append(u, current)
+		for i < size && input[i] == current {
+			i++
 		}
 	}
 	return u
@@ -117,4 +97,43 @@ func GetLogger(debug bool) (zapLog *zap.SugaredLogger) {
 		}
 		return zapLogger.Sugar()
 	}
+}
+
+type RegistryProvider string
+
+const (
+	ECR     RegistryProvider = "ECR"       // Elastic Container Registry
+	GAR                      = "GAR"       // Google Artifact Registry
+	GCR                      = "GCR"       // Google Container Registry
+	ACR                      = "ACR"       // Azure Container Registry
+	DKH                      = "DockerHub" // Dockerhub Registry
+	JFROG                    = "JFROG"     // JFrog Registry
+	QUAY                     = "QUAYIO"    // Quay.io Container Registry
+	UNKNOWN                  = "UNKNOWN"
+)
+
+var ecrRegex = regexp.MustCompile(`^[^.]+\.[^.]+\.ecr\.[^.]+\.amazonaws\.com/.+$`)
+
+func GetRegistryProvider(s string) RegistryProvider {
+	if ecrRegex.MatchString(s) {
+		return ECR
+	}
+	return UNKNOWN
+}
+
+type DockerURI struct {
+	string
+	registryProvider *RegistryProvider
+}
+
+func (uri *DockerURI) GetRegistryProvider() RegistryProvider {
+	if uri.registryProvider == nil {
+		regProvider := GetRegistryProvider(uri.string)
+		uri.registryProvider = &regProvider
+	}
+	return *uri.registryProvider
+}
+
+func (uri *DockerURI) String() string {
+	return uri.string
 }
