@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/digtux/laminar/pkg/shared"
 	"io/ioutil"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func DoChange(change ChangeRequest, log *zap.SugaredLogger) (result bool) {
+func DoChange(change shared.ChangeRequest, log *zap.SugaredLogger) (result bool) {
 
 	r, stringContents := ReadFile(change.File, log)
 

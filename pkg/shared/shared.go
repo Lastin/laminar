@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Misc helper functions
@@ -136,4 +137,15 @@ func (uri *DockerURI) GetRegistryProvider() RegistryProvider {
 
 func (uri *DockerURI) String() string {
 	return uri.string
+}
+
+// ChangeRequests is an object recording what changed and when
+type ChangeRequest struct {
+	Old          string    `json:"old"`
+	New          string    `json:"new"`
+	Time         time.Time `json:"time"`
+	PatternValue string    `json:"patternValue"`
+	PatternType  string    `json:"patternType"`
+	Image        string    `json:"image"`
+	File         string    `json:"file"`
 }

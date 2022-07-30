@@ -219,12 +219,12 @@ func (d *Daemon) singleRepoTask(r web.DockerBuildJSON) {
 //	}
 //}
 
-func (d *Daemon) commitAndPush(changes []ChangeRequest, repo cfg.GitRepo) {
+func (d *Daemon) commitAndPush(changes []shared.ChangeRequest, repo cfg.GitRepo) {
 	msg := ""
 	if len(changes) > 1 {
 		msg = fmt.Sprintf("%s [%d]", d.gitConfig, len(changes))
 	} else {
-		prettyMessage := nicerMessage(changes[0])
+		prettyMessage := gitoperations.NicerMessage(changes[0])
 		//fmt.Println(changes)
 		msg = fmt.Sprintf("%s", prettyMessage)
 	}

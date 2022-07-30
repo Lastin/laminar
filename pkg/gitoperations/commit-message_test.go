@@ -1,27 +1,28 @@
-package cmd
+package gitoperations
 
 import (
+	"github.com/digtux/laminar/pkg/shared"
 	"testing"
 )
 
 func TestNicerMessage(t *testing.T) {
 	regexTests := []struct {
-		input  ChangeRequest
+		input  shared.ChangeRequest
 		output string
 	}{
-		{ChangeRequest{
+		{shared.ChangeRequest{
 			Image: "1122334455.dkr.ecr.eu-west-2.amazonaws.com/acmecorp/myimage",
 			File:  "/some/filename.yaml",
 			New:   "develop-123123",
 		}, "filename: myimage:develop-123123"},
-		{ChangeRequest{
+		{shared.ChangeRequest{
 			Image: "1122334455.dkr.ecr.eu-west-2.amazonaws.com/acmecorp/my-image-name",
 			File:  "/some/path/staging.yaml",
 			New:   "feature-FOO-123123-added-feature-and-made-a-silly-long-branch-name-v1-v6.5.4-3-g0c8df55",
 		}, "staging: my-image-name:feature-FOO-123123-added-fea...g0c8df55"},
 	}
 	for _, test := range regexTests {
-		s := nicerMessage(test.input)
+		s := NicerMessage(test.input)
 		if s != test.output {
 			t.Errorf("TestRegex(%s), got: '%s' but expected: '%s'", test.input, s, test.output)
 		}

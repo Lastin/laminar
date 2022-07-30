@@ -1,11 +1,12 @@
-package cmd
+package gitoperations
 
 import (
 	"fmt"
+	"github.com/digtux/laminar/pkg/shared"
 	"regexp"
 )
 
-func nicerMessage(request ChangeRequest) string {
+func NicerMessage(request shared.ChangeRequest) string {
 	f := truncateForwardSlash(request.File)
 	img := truncateForwardSlash(request.Image)
 	tag := truncateTag(request.New)
