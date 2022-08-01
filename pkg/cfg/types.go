@@ -1,7 +1,6 @@
 package cfg
 
 import (
-	"fmt"
 	"github.com/digtux/laminar/pkg/shared"
 	"github.com/gobwas/glob"
 	"regexp"
@@ -42,57 +41,6 @@ func (d *DockerRegistry) GetRegion() string {
 type BlackList struct {
 	Pattern string `yaml:"pattern"`
 }
-
-// GitRepo which laminar operates on
-type GitRepo struct {
-	URL               string    `yaml:"url"`
-	Branch            string    `yaml:"branch"`
-	Key               string    `yaml:"key"`
-	PollFreq          int       `yaml:"pollFreq"`
-	Name              string    `yaml:"name"`
-	RemoteConfig      bool      `yaml:"remoteConfig"` // propogate []Updates from remote git ".laminar.yaml" ?
-	Updates           []Updates `yaml:"updates,omitempty"`
-	PreCommitCommands []string  `yaml:"preCommitCommands,omitempty"`
-	//PostChange   []PostChanges `yaml:"postChange"`
-}
-
-func (g *GitRepo) GetTotalPathsSize() (total int) {
-	for _, update := range g.Updates {
-		total += len(update.Files)
-	}
-	return
-}
-
-// GetAllFilePaths Returns all file paths combined, and unique
-func (g *GitRepo) GetAllFilePaths() []string {
-	repoPaths := make([]string, g.GetTotalPathsSize())
-	i := 0
-	// now loop though the UpdatePolicies and gather their files[].path values
-	for _, update := range g.Updates {
-		for _, p := range update.Files {
-			repoPaths[i] = p.Path
-			i++
-		}
-	}
-	return shared.UniqueStrings(repoPaths)
-}
-
-func (g *GitRepo) GetRealPath() string {
-	r := regexp.MustCompile("[/:]")
-	//replacedSlash := strings.Replace(registry.Branch, "/", "-", -1)
-	//replacedColon := strings.Replace(replacedSlash, ":", "-", -1)
-	return fmt.Sprintf(
-		"/tmp/%s-%s",
-		r.ReplaceAllString(g.URL, "-"),
-		r.ReplaceAllString(g.Branch, "-"),
-	)
-}
-
-//// PostChanges to do after updating a gitrepo
-//type PostChanges struct {
-//	Action string `yaml:"action"`
-//	Data   string `yaml:"data"`
-//}
 
 // Files to operate upon in a git repo
 type Files struct {

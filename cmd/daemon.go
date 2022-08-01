@@ -2,19 +2,18 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/digtux/laminar/pkg/registryCore"
 	"github.com/digtux/laminar/pkg/shared"
 	"github.com/digtux/laminar/pkg/web"
 	"github.com/pkg/errors"
 	"github.com/tidwall/buntdb"
+	"io/ioutil"
 	"os"
 	"time"
 
 	"github.com/digtux/laminar/pkg/cache"
 	"github.com/digtux/laminar/pkg/cfg"
-	"github.com/digtux/laminar/pkg/gitoperations"
-	"github.com/digtux/laminar/pkg/operations"
-	"github.com/digtux/laminar/pkg/registry"
-	"github.com/go-git/go-git/v5"
+	"github.com/digtux/laminar/pkg/gitOps"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -36,22 +35,14 @@ Laminar is a GitOps utility for automating the promotion of docker images in git
 	},
 }
 
-type GitState struct {
-	Repo    *git.Repository
-	repoCfg *cfg.GitRepo
-}
-
 type Daemon struct {
 	logger               *zap.SugaredLogger
-	dockerRegistryClient *registry.Client
+	dockerRegistryClient *registryCore.Client
 	webClient            *web.Client
 	cacheDb              *buntdb.DB
 	fileList             []string // list of files containing docker images urls
-	gitState             []GitState
-	dockerRegistries     map[string]cfg.DockerRegistry
 	gitConfig            cfg.Global
-	gitOpsClient         *gitoperations.Client
-	opsClient            *operations.Client
+	gitOpsClient         *gitOps.Client
 }
 
 func New() (d *Daemon, err error) {
@@ -61,32 +52,24 @@ func New() (d *Daemon, err error) {
 		return nil, err
 	}
 	cacheDb := cache.Open(configCache, logger)
+	gitOpsClient, err := gitOps.New(logger, appConfig, cacheDb)
+	if err != nil {
+		return
+	}
 	d = &Daemon{
 		logger:               logger,
-		dockerRegistryClient: registry.New(logger, cacheDb),
-		gitState:             nil,
+		dockerRegistryClient: registryCore.New(logger, appConfig.DockerRegistries, cacheDb),
 		webClient:            web.New(logger, appConfig.Global.GitHubToken),
 		cacheDb:              cacheDb,
-		dockerRegistries:     mapDockerRegistries(appConfig.DockerRegistries),
 		gitConfig:            appConfig.Global,
-		gitOpsClient:         gitoperations.New(logger, appConfig.Global),
-		opsClient:            operations.New(logger),
+		gitOpsClient:         gitOpsClient,
 	}
-	d.initialiseGitState(appConfig.GitRepos)
 	return
-}
-
-func mapDockerRegistries(registries []cfg.DockerRegistry) map[string]cfg.DockerRegistry {
-	result := map[string]cfg.DockerRegistry{}
-	for _, reg := range registries {
-		result[reg.Reg] = reg
-	}
-	return result
 }
 
 func loadConfig(logger *zap.SugaredLogger) (appConfig cfg.Config, err error) {
 	var rawFile []byte
-	if rawFile, err = cfg.LoadFile(configFile, logger); err == nil {
+	if rawFile, err = ioutil.ReadFile(configFile); err == nil {
 		if appConfig, err = cfg.ParseConfig(rawFile); err != nil {
 			err = errors.Wrap(err, "error parsing config file")
 		}
@@ -100,16 +83,6 @@ func loadConfig(logger *zap.SugaredLogger) (appConfig cfg.Config, err error) {
 		)
 	}
 	return
-}
-
-func (d *Daemon) initialiseGitState(repos []cfg.GitRepo) {
-	d.gitState = make([]GitState, len(repos))
-	for i, repoCfg := range repos {
-		d.gitState[i] = GitState{
-			Repo:    d.gitOpsClient.InitialGitCloneAndCheckout(repoCfg),
-			repoCfg: &repoCfg,
-		}
-	}
 }
 
 func (d *Daemon) Start() {
@@ -142,9 +115,9 @@ func (d *Daemon) pause() {
 
 func (d *Daemon) masterTask() {
 	// from the update policies, make a list of ALL file paths which are referenced in our gitoperations repo
-	for _, state := range d.gitState {
-		d.updateGitRepoState(state)
-	}
+	//for _, state := range d.gitState {
+	//	d.updateGitRepoState(state)
+	//}
 
 	// TODO: docker reg Timeout?
 	// lets gather a full list of docker images we can find matching the configured registries
@@ -224,7 +197,7 @@ func (d *Daemon) commitAndPush(changes []shared.ChangeRequest, repo cfg.GitRepo)
 	if len(changes) > 1 {
 		msg = fmt.Sprintf("%s [%d]", d.gitConfig, len(changes))
 	} else {
-		prettyMessage := gitoperations.NicerMessage(changes[0])
+		prettyMessage := gitOps.NicerMessage(changes[0])
 		//fmt.Println(changes)
 		msg = fmt.Sprintf("%s", prettyMessage)
 	}
@@ -262,63 +235,63 @@ func (d *Daemon) commitAndPush(changes []shared.ChangeRequest, repo cfg.GitRepo)
 //	}
 //}
 
-func (d *Daemon) updateGitRepoState(state GitState) {
-	// Clone all repos that haven't been cloned yet
-	if state.Repo != nil {
-		d.gitOpsClient.Pull(*state.repoCfg)
-	} else {
-		d.logger.Warnw("repo has not been initialised",
-			"repo.URL", state.repoCfg.URL)
-		//TODO: implement initialisation of uninitialised repos (probs issue for dynamic configs)
-		return
-	}
+//func (d *Daemon) updateGitRepoState(state gitoperations.RepoState) {
+//	// Clone all repos that haven't been cloned yet
+//	if state.Repo != nil {
+//		d.gitOpsClient.Pull(*state.repoCfg)
+//	} else {
+//		d.logger.Warnw("repo has not been initialised",
+//			"repo.URL", state.repoCfg.URL)
+//		//TODO: implement initialisation of uninitialised repos (probs issue for dynamic configs)
+//		return
+//	}
+//
+//	// This sections deals with loading remote config from the gitoperations repo
+//	// if RemoteConfig is set we want to attempt to read '.laminar.yaml' from the remote repo
+//	repoPath := state.repoCfg.GetRealPath()
+//	if state.repoCfg.RemoteConfig {
+//		d.logger.Debugw("'remote config' == True.. will attempt to update config dynamically",
+//			"laminar.repo", state.repoCfg.Name,
+//		)
+//
+//		remoteUpdates, err := cfg.getRemoteUpdates(repoPath, d.logger)
+//		if err != nil {
+//			d.logger.Warnw("Laminar was told to look at .laminar.yaml but failed",
+//				"laminar.repo", state.repoCfg.Name,
+//				"laminar.path", repoPath,
+//				"laminar.error", err,
+//			)
+//		}
+//
+//		// clear out the Updates for this repoNum
+//		state.repoCfg.Updates = make([]cfg.Updates, 0)
+//		// now assemble that list for this run
+//		for _, update := range remoteUpdates.Updates {
+//			d.logger.Infow("using 'remote config' from gitoperations repo .laminar.yaml",
+//				"laminar.update", update,
+//			)
+//			state.repoCfg.Updates = append(state.repoCfg.Updates, update)
+//		}
+//	}
+//	// equalise the state.. damn this needs a nice rewrite sometime
+//	d.logger.Infow("configured for",
+//		"laminar.gitRepo", state.repoCfg.Name,
+//		"laminar.updateRules", len(state.repoCfg.Updates),
+//	)
+//	//d.UpdateFileList(*state.repoCfg)
+//
+//	// we are ready to dispatch this to start searching the contents of these files
+//	d.logger.Debugw("matched files in gitoperations",
+//		"laminar.GitRepo", state.repoCfg.Name,
+//		"laminar.fileList", d.fileList,
+//	)
+//}
 
-	// This sections deals with loading remote config from the gitoperations repo
-	// if RemoteConfig is set we want to attempt to read '.laminar.yaml' from the remote repo
-	repoPath := state.repoCfg.GetRealPath()
-	if state.repoCfg.RemoteConfig {
-		d.logger.Debugw("'remote config' == True.. will attempt to update config dynamically",
-			"laminar.repo", state.repoCfg.Name,
-		)
-
-		remoteUpdates, err := cfg.GetUpdatesFromGit(repoPath, d.logger)
-		if err != nil {
-			d.logger.Warnw("Laminar was told to look at .laminar.yaml but failed",
-				"laminar.repo", state.repoCfg.Name,
-				"laminar.path", repoPath,
-				"laminar.error", err,
-			)
-		}
-
-		// clear out the Updates for this repoNum
-		state.repoCfg.Updates = make([]cfg.Updates, 0)
-		// now assemble that list for this run
-		for _, update := range remoteUpdates.Updates {
-			d.logger.Infow("using 'remote config' from gitoperations repo .laminar.yaml",
-				"laminar.update", update,
-			)
-			state.repoCfg.Updates = append(state.repoCfg.Updates, update)
-		}
-	}
-	// equalise the state.. damn this needs a nice rewrite sometime
-	d.logger.Infow("configured for",
-		"laminar.gitRepo", state.repoCfg.Name,
-		"laminar.updateRules", len(state.repoCfg.Updates),
-	)
-	//d.UpdateFileList(*state.repoCfg)
-
-	// we are ready to dispatch this to start searching the contents of these files
-	d.logger.Debugw("matched files in gitoperations",
-		"laminar.GitRepo", state.repoCfg.Name,
-		"laminar.fileList", d.fileList,
-	)
-}
-
-func (d *Daemon) getRegistryStrings() []string {
-	// this is a slice of the registry URLs as we expect to see them inside files
-	var registryStrings []string
-	for _, reg := range d.dockerRegistries {
-		registryStrings = append(registryStrings, reg.Reg)
-	}
-	return registryStrings
-}
+//func (d *Daemon) getRegistryStrings() []string {
+//	// this is a slice of the registry URLs as we expect to see them inside files
+//	var registryStrings []string
+//	for _, reg := range d.dockerRegistries {
+//		registryStrings = append(registryStrings, reg.Reg)
+//	}
+//	return registryStrings
+//}

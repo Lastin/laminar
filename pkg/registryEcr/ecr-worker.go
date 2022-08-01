@@ -1,4 +1,4 @@
-package ecr
+package registryEcr
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
@@ -68,7 +68,7 @@ func castAll(imageList []shared.DockerURI) (result []EcrURI, err error) {
 	result = make([]EcrURI, len(imageList))
 	for i, image := range imageList {
 		var ecrUri *EcrURI
-		ecrUri, err = new(EcrURI).fromURI(image)
+		ecrUri, err = new(EcrURI).fromURI(&image)
 		if err != nil {
 			return nil, err
 		}

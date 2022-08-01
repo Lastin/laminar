@@ -1,4 +1,4 @@
-package gitoperations
+package gitOps
 
 import (
 	"fmt"

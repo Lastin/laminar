@@ -16,23 +16,13 @@ import (
 // Misc helper functions
 
 // GetFileAbsPath will expand on something such as ~/.ssh/my_id_rsa and return a string like /home/user/.ssh/my_id_rsa
-func GetFileAbsPath(fileName string, log *zap.SugaredLogger) (result string) {
-
+func GetFileAbsPath(fileName string) (result string, err error) {
 	if strings.HasPrefix(fileName, "~/") {
 		usr, _ := user.Current()
 		dir := usr.HomeDir
 		fileName = filepath.Join(dir, fileName[2:])
 	}
-
-	result, err := filepath.Abs(fileName)
-	if err != nil {
-		log.Fatalw("unable to determine path to a operations",
-			"fileName", fileName,
-			"error", err,
-		)
-	}
-
-	return result
+	return filepath.Abs(fileName)
 }
 
 // IsDir will return true if the path is a directory
@@ -120,23 +110,6 @@ func GetRegistryProvider(s string) RegistryProvider {
 		return ECR
 	}
 	return UNKNOWN
-}
-
-type DockerURI struct {
-	string
-	registryProvider *RegistryProvider
-}
-
-func (uri *DockerURI) GetRegistryProvider() RegistryProvider {
-	if uri.registryProvider == nil {
-		regProvider := GetRegistryProvider(uri.string)
-		uri.registryProvider = &regProvider
-	}
-	return *uri.registryProvider
-}
-
-func (uri *DockerURI) String() string {
-	return uri.string
 }
 
 // ChangeRequests is an object recording what changed and when

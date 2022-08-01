@@ -10,7 +10,7 @@ import (
 var (
 	configFile    string // configuration file that laminar will read
 	debug         bool   // True enables verbose and human friendly logging
-	configCache   string // buntDB cache.. either "/something.db" or ":memory"
+	configCache   string // buntDB cache.. either "/something.db" or ":memory:"
 	oneShot       bool   // if laminar should just run once and terminate
 	interval      time.Duration
 	pauseDuration time.Duration // when laminar is asked to pause, it'll hold off on any operations for this long

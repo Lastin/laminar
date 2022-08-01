@@ -1,4 +1,4 @@
-package gitoperations
+package gitOps
 
 import (
 	"bytes"
@@ -11,20 +11,7 @@ import (
 	"github.com/digtux/laminar/pkg/cfg"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"go.uber.org/zap"
 )
-
-type Client struct {
-	logger *zap.SugaredLogger
-	config cfg.Global
-}
-
-func New(logger *zap.SugaredLogger, config cfg.Global) *Client {
-	return &Client{
-		logger: logger,
-		config: config,
-	}
-}
 
 func (c *Client) executeCmd(command string, path string) {
 
@@ -93,8 +80,8 @@ func (c *Client) CommitAndPush(registry cfg.GitRepo, message string) {
 	commit, err := w.Commit(message, &git.CommitOptions{
 		All: true,
 		Author: &object.Signature{
-			Name:  c.config.GitUser,
-			Email: c.config.GitEmail,
+			Name:  c.config.Global.GitUser,
+			Email: c.config.Global.GitEmail,
 			When:  time.Now(),
 		},
 	})
