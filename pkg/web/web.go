@@ -91,6 +91,7 @@ func (client *Client) StartWeb() {
 		"/webhooks/build/docker",
 		client.handleDockerBuildWebhook,
 	)
+	e.GET("/api/repos", client.getApiRepos)
 	e.Logger.Fatal(e.Start(":8080"))
 }
 
@@ -156,4 +157,9 @@ func isIssueComment(input http.Header) bool {
 		}
 	}
 	return false
+}
+
+func (client *Client) getApiRepos(ctx echo.Context) (err error) {
+
+	return err
 }

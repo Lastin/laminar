@@ -6,27 +6,31 @@ import (
 	"go.uber.org/zap"
 )
 
+type GitConfig struct {
+	GitUser  string
+	GitEmail string
+}
+
 type Client struct {
-	logger  *zap.SugaredLogger
-	config  cfg.Config
-	cacheDb *buntdb.DB
-	states  []RepoState
+	logger    *zap.SugaredLogger
+	cacheDb   *buntdb.DB
+	states    []RepoState
+	gitConfig GitConfig
 }
 
 type RepoState struct {
-	repoCfg *cfg.GitRepo
-	cloned  bool
+	repoCfg     *cfg.GitRepo
+	cloned      bool
+	hasBeenRead bool
 }
 
-func New(logger *zap.SugaredLogger, config cfg.Config, cacheDb *buntdb.DB) (c *Client, err error) {
-	c = &Client{
-		logger:  logger,
-		config:  config,
-		cacheDb: cacheDb,
-		states:  getEmptyStates(config.GitRepos),
+func New(logger *zap.SugaredLogger, gitConfig GitConfig, repos []cfg.GitRepo, cacheDb *buntdb.DB) *Client {
+	return &Client{
+		logger:    logger,
+		gitConfig: gitConfig,
+		cacheDb:   cacheDb,
+		states:    getEmptyStates(repos),
 	}
-	err = c.updateAll()
-	return
 }
 
 func getEmptyStates(repos []cfg.GitRepo) (states []RepoState) {
@@ -39,7 +43,7 @@ func getEmptyStates(repos []cfg.GitRepo) (states []RepoState) {
 	return
 }
 
-func (c *Client) updateAll() (err error) {
+func (c *Client) UpdateAll() (err error) {
 	for _, state := range c.states {
 		err = c.updateState(&state)
 		if err != nil {
@@ -54,12 +58,17 @@ func (c *Client) updateState(state *RepoState) (err error) {
 	if !state.cloned {
 		err = c.cloneFresh(state.repoCfg)
 	} else {
-		err = c.Pull(state.repoCfg)
+		err = c.Pull(state)
 	}
 	if err == nil {
 		err = state.reviewRemoteUpdates()
 	}
+
 	return
+}
+
+func (c *Client) GetStates() []RepoState {
+	return c.states
 }
 
 func (state *RepoState) reviewRemoteUpdates() (err error) {
@@ -71,6 +80,14 @@ func (state *RepoState) reviewRemoteUpdates() (err error) {
 		if err == nil {
 			state.repoCfg.SetUpdates(remoteUpdates)
 		}
+	}
+	return
+}
+
+func (state *RepoState) GetFilesToScan() (result []string) {
+	if state.hasBeenRead {
+		result = state.repoCfg.GetAllFilePaths()
+		state.hasBeenRead = true
 	}
 	return
 }

@@ -2,6 +2,7 @@ package gitOps
 
 import (
 	"fmt"
+	"github.com/digtux/laminar/pkg/metrics"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -13,9 +14,10 @@ import (
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
-func (c *Client) Pull(repoCfg *cfg.GitRepo) (err error) {
+func (c *Client) Pull(state *RepoState) (err error) {
+	metrics.Pulls.WithLabelValues(state.repoCfg.Name)
 	var repo *git.Repository
-	repo, err = git.PlainOpen(repoCfg.GetRealPath())
+	repo, err = git.PlainOpen(state.repoCfg.GetRealPath())
 	if err == nil {
 		var worktree *git.Worktree
 		worktree, err = repo.Worktree()
@@ -27,27 +29,15 @@ func (c *Client) Pull(repoCfg *cfg.GitRepo) (err error) {
 			if err == git.NoErrAlreadyUpToDate {
 				c.logger.Debugf("pull success, already up-to-date")
 				err = nil
+			} else {
+				state.hasBeenRead = true
 			}
 		}
 	}
 	if err == nil {
-		c.logger.Debugw("repository pulled", "commitId", c.GetCommitId(repoCfg))
+		c.logger.Debugw("repository pulled", "commitId", getCommitId(state.repoCfg))
 	}
 	return
-}
-
-func (c *Client) purgeIfExists(repoConfig *cfg.GitRepo) (err error) {
-	diskPath := repoConfig.GetRealPath()
-	if shared.IsDir(diskPath, c.logger) {
-		c.logger.Debugw("previous checkout detected.. purging it",
-			"path", diskPath,
-		)
-		err = os.RemoveAll(diskPath)
-	}
-	if err != nil {
-		c.logger.Errorw("failed to purge", err)
-	}
-	return err
 }
 
 // cloneFresh All-In-One method that will do a clone and checkout
@@ -67,7 +57,22 @@ func (c *Client) cloneFresh(repoConfig *cfg.GitRepo) (err error) {
 	return
 }
 
+func (c *Client) purgeIfExists(repoConfig *cfg.GitRepo) (err error) {
+	diskPath := repoConfig.GetRealPath()
+	if shared.IsDir(diskPath, c.logger) {
+		c.logger.Debugw("previous checkout detected.. purging it",
+			"path", diskPath,
+		)
+		err = os.RemoveAll(diskPath)
+	}
+	if err != nil {
+		c.logger.Errorw("failed to purge", err)
+	}
+	return err
+}
+
 func (c *Client) cloneAndCheckout(repoConfig *cfg.GitRepo) (err error) {
+	metrics.Clones.WithLabelValues(repoConfig.Name)
 	mergeRef := plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", repoConfig.Branch))
 
 	var repo *git.Repository
@@ -109,7 +114,7 @@ func getRemoteUpdates(path string) (updates *cfg.RemoteUpdates, err error) {
 	return
 }
 
-func (c *Client) GetCommitId(repoCfg *cfg.GitRepo) string {
+func getCommitId(repoCfg *cfg.GitRepo) string {
 	repo, err := git.PlainOpen(repoCfg.GetRealPath())
 	if err == nil {
 		ref, err := repo.Head()

@@ -80,8 +80,8 @@ func (c *Client) CommitAndPush(registry cfg.GitRepo, message string) {
 	commit, err := w.Commit(message, &git.CommitOptions{
 		All: true,
 		Author: &object.Signature{
-			Name:  c.config.Global.GitUser,
-			Email: c.config.Global.GitEmail,
+			Name:  c.gitConfig.GitUser,
+			Email: c.gitConfig.GitEmail,
 			When:  time.Now(),
 		},
 	})

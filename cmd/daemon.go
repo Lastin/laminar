@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/digtux/laminar/pkg/metrics"
 	"github.com/digtux/laminar/pkg/registryCore"
 	"github.com/digtux/laminar/pkg/shared"
 	"github.com/digtux/laminar/pkg/web"
@@ -52,7 +53,6 @@ func New() (d *Daemon, err error) {
 		return nil, err
 	}
 	cacheDb := cache.Open(configCache, logger)
-	gitOpsClient, err := gitOps.New(logger, appConfig, cacheDb)
 	if err != nil {
 		return
 	}
@@ -62,7 +62,15 @@ func New() (d *Daemon, err error) {
 		webClient:            web.New(logger, appConfig.Global.GitHubToken),
 		cacheDb:              cacheDb,
 		gitConfig:            appConfig.Global,
-		gitOpsClient:         gitOpsClient,
+		gitOpsClient: gitOps.New(
+			logger,
+			gitOps.GitConfig{
+				GitUser:  appConfig.Global.GitUser,
+				GitEmail: appConfig.Global.GitEmail,
+			},
+			appConfig.GitRepos,
+			cacheDb,
+		),
 	}
 	return
 }
@@ -87,6 +95,7 @@ func loadConfig(logger *zap.SugaredLogger) (appConfig cfg.Config, err error) {
 
 func (d *Daemon) Start() {
 	go d.webClient.StartWeb()
+	go metrics.Start(d.logger)
 	d.logger.Debug("opened db: ", configCache)
 	d.enterControlLoop()
 }
@@ -114,6 +123,19 @@ func (d *Daemon) pause() {
 }
 
 func (d *Daemon) masterTask() {
+	var err error
+	err = d.gitOpsClient.UpdateAll()
+	if err == nil {
+		repoStates := d.gitOpsClient.GetStates()
+		for _, state := range repoStates {
+			for _, filePath := range state.GetFilesToScan() {
+				d.logger.Infow("scanning", filePath)
+			}
+		}
+	}
+	if err != nil {
+		d.logger.Error(err)
+	}
 	// from the update policies, make a list of ALL file paths which are referenced in our gitoperations repo
 	//for _, state := range d.gitState {
 	//	d.updateGitRepoState(state)
